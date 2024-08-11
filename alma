@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract DAO {
+    struct Proposal {
+        address proposer;
+        string description;
+        uint256 votingDeadline;
+        uint256 yesVotes;
+        uint256 noVotes;
+        bool executed;
+        mapping(address => bool) hasVoted;
+    }
+
+    Proposal[] public proposals;
+
+    event ProposalAdded(uint256 indexed proposalId, address indexed proposer);
+    event Voted(uint256 indexed proposalId, address indexed voter, bool vote);
+    event ProposalExecuted(uint256 indexed proposalId, address indexed executor);
+
+    function propose(string memory _description, uint256 _votingPeriod) public {
+        proposals.push(Proposal({
+            proposer: msg.sender,
+            description: _description,
+            votingDeadline: block.timestamp + _votingPeriod,
+            yesVotes: 0,
+            noVotes: 0,
+            executed: false
+        }));
+        emit ProposalAdded(proposals.length - 1, msg.sender);
+    }
+
+    function vote(uint256 _proposalId, bool _vote) public {
+        Proposal storage proposal = proposals[_proposalId];
+        require(!proposal.executed, "Proposal already executed");
+        require(!proposal.hasVoted[msg.sender], "Already voted");
+        require(block.timestamp < proposal.votingDeadline, "Voting period over");
+        if (_vote) {
+            proposal.yesVotes++;
+        } else {
+            proposal.noVotes++;
+        }
+        proposal.hasVoted[msg.sender] = true;
+        emit Voted(_proposalId, msg.sender, _vote);
+    }
+
+    function executeProposal(uint256 _proposalId) public {
+        Proposal storage proposal = proposals[_proposalId];
+        require(!proposal.executed, "Proposal already executed");
+        require(block.timestamp >= proposal.votingDeadline, "Voting period not over");
+        require(proposal.yesVotes > proposal.noVotes, "Proposal rejected");
+        proposal.executed = true;
+        emit ProposalExecuted(_proposalId, msg.sender);
+    }
+}
